@@ -8,7 +8,7 @@ import '../model/animated_polyline.dart';
 typedef PolylineListener = void Function(Polyline);
 typedef MarkerListener = void Function(Set<Marker>);
 
-final class MapAnimationController {
+final class MapAnimationController with WidgetsBindingObserver {
   final TickerProvider vsync;
 
   final MarkerListener? markerListener;
@@ -24,6 +24,9 @@ final class MapAnimationController {
   /// rotation value set in the Marker object.
   final bool autoRotateMarkers;
 
+  /// Internal flag to track if animations are paused
+  bool _isPaused = false;
+
   MapAnimationController({
     required this.mapId,
     required this.vsync,
@@ -33,7 +36,33 @@ final class MapAnimationController {
     this.markerListener,
     this.autoRotateMarkers = true,
   }) {
+    // Register lifecycle observer to handle app state changes
+    WidgetsBinding.instance.addObserver(this);
     _initialize(markers, polylines);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // Resume animations when app returns to foreground
+        _isPaused = false;
+        // Clear animation queues to prevent rapid catch-up when resuming
+        _animatedMarkersManager.clearAllQueues();
+        // Update markers to current position without animation catch-up
+        if (_markers.isNotEmpty) {
+          final currentMarkers = _markers.values.toSet();
+          _updateMarkersOnMap({}, currentMarkers);
+        }
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // Pause animations when app goes to background
+        _isPaused = true;
+        break;
+    }
   }
 
   /// Manager responsible for animating marker transitions
@@ -97,6 +126,14 @@ final class MapAnimationController {
   }
 
   void updateMarkers(Set<Marker> updatedMarkers) {
+    // Skip updates if app is in background/paused state
+    if (_isPaused) {
+      // Store the latest marker positions without animation
+      _markers.clear();
+      _markers.addAll(keyByMarkerId(updatedMarkers));
+      return;
+    }
+
     final newMarkersById = keyByMarkerId(updatedMarkers);
 
     // Identify markers that were added, removed, or updated
@@ -216,6 +253,19 @@ final class MapAnimationController {
     _updateMarkersOnMap(prevMarkers, _markers.values.toSet());
   }
 
+  /// Force immediate marker position update without animation
+  /// Useful when resuming from background or resetting positions
+  void setMarkersImmediate(Set<Marker> markers) {
+    final prevMarkers = Set<Marker>.from(_markers.values);
+    _markers.clear();
+    _markers.addAll(keyByMarkerId(markers));
+
+    // Clear animation queues to prevent catch-up
+    _animatedMarkersManager.clearAllQueues();
+
+    _updateMarkersOnMap(prevMarkers, _markers.values.toSet());
+  }
+
   void _updatePolyline(Polyline updatedPolyline) {
     final prevPolylines = Set<Polyline>.from(_polylines.values);
 
@@ -233,14 +283,25 @@ final class MapAnimationController {
     _updatePolylinesOnMap(prevPolyline, _polylines.values.toSet());
   }
 
+  // Debounce marker updates to reduce platform channel calls
+  bool _isUpdatingMarkers = false;
+
   Future<void> _updateMarkersOnMap(
     Set<Marker> previous,
     Set<Marker> current,
   ) async {
-    GoogleMapsFlutterPlatform.instance.updateMarkers(
-      MarkerUpdates.from(previous, current),
-      mapId: mapId,
-    );
+    // Skip if already updating to prevent concurrent updates
+    if (_isUpdatingMarkers) return;
+
+    _isUpdatingMarkers = true;
+    try {
+      await GoogleMapsFlutterPlatform.instance.updateMarkers(
+        MarkerUpdates.from(previous, current),
+        mapId: mapId,
+      );
+    } finally {
+      _isUpdatingMarkers = false;
+    }
   }
 
   Future<void> _updatePolylinesOnMap(
@@ -254,6 +315,7 @@ final class MapAnimationController {
   }
 
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _animatedMarkersManager.dispose();
     _animatedPolylineManager.dispose();
     _markers.clear();

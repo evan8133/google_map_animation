@@ -19,6 +19,7 @@ class MarkerController {
   final Queue<Marker> _queue = Queue<Marker>();
 
   bool get hasMarker => _queue.isNotEmpty;
+  int get queueSize => _queue.length;
 
   MarkerController({
     required Marker marker,
@@ -41,17 +42,30 @@ class MarkerController {
   }
 
   void pushToQueue(Marker m) {
-    if (_currentMarker == m) {
+    // Skip if marker hasn't actually moved (prevents unnecessary animations)
+    if (_currentMarker.position == m.position &&
+        _currentMarker.rotation == m.rotation) {
       return;
     }
 
     _queue.addLast(m);
   }
 
+  /// Clear all queued markers except the last one
+  /// This prevents excessive catch-up animations when returning to the screen
+  void clearQueue() {
+    if (_queue.isEmpty) return;
+    final lastMarker = _queue.last;
+    _queue.clear();
+    _queue.addLast(lastMarker);
+  }
+
   void setupNextMarker() {
     if (_queue.isEmpty) return;
     final nextMarker = _queue.removeFirst();
     _setupTo(nextMarker);
+    // Reset cache when setting up new animation
+    resetCache();
   }
 
   void _setupTo(Marker m) {
@@ -64,10 +78,28 @@ class MarkerController {
     }
   }
 
+  // Cache the last animated marker to reduce object creation
+  Marker? _lastAnimatedMarker;
+  double _lastT = -1.0;
+
   Marker animate(double t) {
-    return _currentMarker.copyWith(
+    // Return cached marker if t hasn't changed significantly (reduces flickering)
+    if (_lastT == t && _lastAnimatedMarker != null) {
+      return _lastAnimatedMarker!;
+    }
+
+    _lastT = t;
+    _lastAnimatedMarker = _currentMarker.copyWith(
       positionParam: _locationTween.lerp(t),
       rotationParam: _bearingTween.lerp(t),
     );
+
+    return _lastAnimatedMarker!;
+  }
+
+  /// Reset animation cache
+  void resetCache() {
+    _lastAnimatedMarker = null;
+    _lastT = -1.0;
   }
 }
