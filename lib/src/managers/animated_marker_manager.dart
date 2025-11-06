@@ -9,6 +9,7 @@ class AnimatedMarkersManager {
     required Duration duration,
     required this.onUpdateMarkers,
     required this.onRemoveMarkers,
+    this.autoRotate = true,
   }) {
     // 16.67 ms per frame for 60 FPS (1000 ms / 60 FPS) ~= 16.67 ms
     totalFrames = (duration.inMilliseconds / 16.67).round();
@@ -23,6 +24,7 @@ class AnimatedMarkersManager {
 
   final ValueChanged<Set<Marker>> onUpdateMarkers;
   final ValueChanged<Set<MarkerId>> onRemoveMarkers;
+  final bool autoRotate;
 
   final Map<MarkerId, MarkerController> _controllers = {};
 
@@ -37,6 +39,7 @@ class AnimatedMarkersManager {
       final controller = _controllers[marker.markerId] ??= MarkerController(
         marker: marker,
         animationController: _animationController,
+        autoRotate: autoRotate,
       );
 
       controller.pushToQueue(marker);

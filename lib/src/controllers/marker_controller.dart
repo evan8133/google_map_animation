@@ -8,6 +8,7 @@ import '../tween/location_tween.dart';
 
 class MarkerController {
   final AnimationController _animationController;
+  final bool autoRotate;
 
   late final LocationTween _locationTween;
   late final BearingTween _bearingTween;
@@ -22,6 +23,7 @@ class MarkerController {
   MarkerController({
     required Marker marker,
     required AnimationController animationController,
+    this.autoRotate = true,
   }) : _currentMarker = marker,
        _animationController = animationController {
     _locationTween = LocationTween(
@@ -55,7 +57,11 @@ class MarkerController {
   void _setupTo(Marker m) {
     _currentMarker = m;
     _locationTween.swap(m.position);
-    _bearingTween.swap(_locationTween.bearing);
+    if (autoRotate) {
+      _bearingTween.swap(_locationTween.bearing);
+    } else {
+      _bearingTween.swap(m.rotation);
+    }
   }
 
   Marker animate(double t) {

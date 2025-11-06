@@ -51,6 +51,38 @@ flutter pub get
 
 ## Usage
 
+### ⚠️ Important: Marker Management
+
+**DO NOT** set markers on both the `GoogleMap` widget **AND** the `MapAnimationController`. This will cause duplicate markers to appear on the map.
+
+**❌ Wrong - Will cause duplicates:**
+```dart
+GoogleMap(
+  markers: myMarkers, // ❌ Don't do this
+  onMapCreated: (controller) {
+    mapAnimationController = MapAnimationController(
+      mapId: controller.mapId,
+      vsync: this,
+      markers: myMarkers, // ❌ Don't pass markers here too
+    );
+  },
+)
+```
+
+**✅ Correct - Let MapAnimationController manage markers:**
+```dart
+GoogleMap(
+  // Don't set markers parameter
+  onMapCreated: (controller) {
+    mapAnimationController = MapAnimationController(
+      mapId: controller.mapId,
+      vsync: this,
+      markers: myMarkers, // ✅ Only set markers here
+    );
+  },
+)
+```
+
 ### Basic Setup
 
 ```dart
@@ -86,6 +118,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         target: LatLng(23.0181, 72.5897),
         zoom: 14.0,
       ),
+      // Do NOT set markers: parameter here if using MapAnimationController
     );
   }
 }
@@ -139,7 +172,15 @@ final markers = <Marker>{
 };
 
 mapAnimationController?.updateMarkers(markers);
+
+// Clear all markers from the map
+mapAnimationController?.clearMarkers();
 ```
+
+#### Marker Management Methods
+
+- **`updateMarkers(Set<Marker> markers)`**: Add or update markers with animation
+- **`clearMarkers()`**: Remove all markers from the map at once
 
 
 
@@ -169,6 +210,31 @@ The `MapAnimationController` is the main controller for managing polyline and ma
 - **`polylines`**: Initial set of animated polylines (optional, default: empty set)
 - **`markersAnimationDuration`**: Duration for marker transitions (default: 2000ms)
 - **`markerListener`**: Callback for marker updates (optional)
+- **`autoRotateMarkers`**: Enable/disable automatic marker rotation based on movement direction (default: `true`)
+
+### Marker Rotation Control
+
+By default, markers automatically rotate to face the direction of movement during animation. You can disable this behavior and control rotation manually:
+
+```dart
+mapAnimationController = MapAnimationController(
+  mapId: controller.mapId,
+  vsync: this,
+  autoRotateMarkers: false, // Disable automatic rotation
+);
+
+// Now you can control marker rotation manually
+final marker = Marker(
+  markerId: MarkerId('marker_1'),
+  position: LatLng(23.0181, 72.5897),
+  rotation: 45.0, // Custom rotation in degrees
+);
+```
+
+When `autoRotateMarkers` is set to `false`:
+- Markers will maintain their specified rotation value
+- You have full control over marker rotation
+- Useful for icons that shouldn't rotate or have custom rotation logic
 
 ### Available Animators
 

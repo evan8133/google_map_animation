@@ -18,6 +18,12 @@ final class MapAnimationController {
   /// Duration for marker animation transitions. Default is 2 second.
   final Duration markersAnimationDuration;
 
+  /// Whether to automatically rotate markers based on their movement direction.
+  /// When true (default), markers will automatically rotate to face the direction
+  /// of movement during animation. When false, markers will maintain their
+  /// rotation value set in the Marker object.
+  final bool autoRotateMarkers;
+
   MapAnimationController({
     required this.mapId,
     required this.vsync,
@@ -25,6 +31,7 @@ final class MapAnimationController {
     Set<AnimatedPolyline> polylines = const {},
     this.markersAnimationDuration = const Duration(milliseconds: 2000),
     this.markerListener,
+    this.autoRotateMarkers = true,
   }) {
     _initialize(markers, polylines);
   }
@@ -41,12 +48,16 @@ final class MapAnimationController {
 
   void _initialize(Set<Marker> markers, Set<AnimatedPolyline> polylines) {
     // Initialize markers from widget properties
-    // update directly to the map
-    // newly added markers wont be updated if manager is not animating markers
+    // Note: Do not pass markers to the GoogleMap widget's markers parameter
+    // if you're using MapAnimationController. The controller manages all markers.
+    // Passing markers to both will cause duplicate markers on the map.
 
     _markers.addAll(keyByMarkerId(markers));
     final markerSet = _markers.values.toSet();
 
+    // Initialize with empty previous set since this is the first update
+    // If you see duplicate markers, make sure you're not setting markers
+    // on the GoogleMap widget itself
     _updateMarkersOnMap({}, markerSet);
 
     // Set up the markers animation manager
@@ -55,6 +66,7 @@ final class MapAnimationController {
       duration: markersAnimationDuration,
       onUpdateMarkers: _updateMarker,
       onRemoveMarkers: _removeMarker,
+      autoRotate: autoRotateMarkers,
     );
 
     _animatedMarkersManager.push(markerSet);
@@ -165,6 +177,21 @@ final class MapAnimationController {
   /// Useful for update the polyline on marker update using [markerListener].
   void updateStaticPolyline(Polyline polyline) {
     _updatePolyline(polyline);
+  }
+
+  /// Clear all markers from the map and the animation controller
+  /// Use this method to remove all markers at once, useful for resetting the map state
+  void clearMarkers() {
+    final prevMarkers = Set<Marker>.from(_markers.values);
+    _markers.clear();
+
+    // Clear all marker controllers from the animation manager
+    for (final markerId in prevMarkers.map((m) => m.markerId)) {
+      _animatedMarkersManager.removeMarker(markerId);
+    }
+
+    // Update the map to remove all markers
+    _updateMarkersOnMap(prevMarkers, {});
   }
 
   void _removeMarker(Set<MarkerId> markerIds) {

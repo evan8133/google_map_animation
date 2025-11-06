@@ -160,12 +160,19 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           target: LatLng(23.02246, 72.59891),
           zoom: 16.0,
         ),
+        // IMPORTANT: Do NOT set markers here if using MapAnimationController
+        // The controller manages all markers to avoid duplicates
+        // markers: _markers.values.toSet(), // ❌ Don't do this!
         onMapCreated: (controller) {
           mapController = controller;
           mapAnimationController = MapAnimationController(
             mapId: controller.mapId,
             vsync: this,
+            markers: _markers.values.toSet(), // ✅ Pass markers to controller
             polylines: _polylines,
+            // Set to false to manually control marker rotation
+            // Set to true (default) for automatic rotation based on movement direction
+            autoRotateMarkers: true,
           );
         },
       ),
