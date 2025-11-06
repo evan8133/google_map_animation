@@ -10,7 +10,7 @@ class AnimatedMarkersManager {
     required this.onUpdateMarkers,
     required this.onRemoveMarkers,
     this.autoRotate = true,
-  }) : _duration = duration {
+  }) {
     // 16.67 ms per frame for 60 FPS (1000 ms / 60 FPS) ~= 16.67 ms
     totalFrames = (duration.inMilliseconds / 16.67).round();
 
@@ -21,7 +21,6 @@ class AnimatedMarkersManager {
 
   late final int totalFrames;
   late final AnimationController _animationController;
-  final Duration _duration;
 
   final ValueChanged<Set<Marker>> onUpdateMarkers;
   final ValueChanged<Set<MarkerId>> onRemoveMarkers;
@@ -33,9 +32,6 @@ class AnimatedMarkersManager {
 
   int _lastFrameIndex = -1;
   int _updateThrottle = 0;
-
-  // Track animation start time for lifecycle management
-  int? _animationStartTime;
 
   // Maximum queue size to prevent excessive catch-up animations
   static const int _maxQueueSize = 3;
@@ -75,7 +71,6 @@ class AnimatedMarkersManager {
     if (animationRequired) {
       _lastFrameIndex = -1;
       _updateThrottle = 0;
-      _animationStartTime = DateTime.now().millisecondsSinceEpoch;
 
       _animationController.reset();
       _animationController.forward();
@@ -148,8 +143,9 @@ class AnimatedMarkersManager {
 
     // Throttle updates - only update every N frames (reduces flickering)
     _updateThrottle++;
-    if (_updateThrottle % 2 != 0 && t < 1.0)
+    if (_updateThrottle % 2 != 0 && t < 1.0) {
       return; // Update every other frame, except at end
+    }
 
     final Set<Marker> markerPosition = {};
 

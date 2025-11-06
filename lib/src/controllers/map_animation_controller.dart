@@ -59,11 +59,8 @@ final class MapAnimationController with WidgetsBindingObserver {
     // Clear queues to prevent catch-up
     _animatedMarkersManager.clearAllQueues();
     _animatedMarkersManager.resume();
-    // Update to current position
-    if (_markers.isNotEmpty) {
-      final currentMarkers = _markers.values.toSet();
-      _updateMarkersOnMap({}, currentMarkers);
-    }
+    // Don't call _updateMarkersOnMap here - markers are already on the map
+    // Calling it causes duplicates. Just resume the animation controller.
   }
 
   @override
@@ -74,11 +71,8 @@ final class MapAnimationController with WidgetsBindingObserver {
         _isPaused = false;
         // Clear animation queues to prevent rapid catch-up when resuming
         _animatedMarkersManager.clearAllQueues();
-        // Update markers to current position without animation catch-up
-        if (_markers.isNotEmpty) {
-          final currentMarkers = _markers.values.toSet();
-          _updateMarkersOnMap({}, currentMarkers);
-        }
+        // Don't update platform markers here - they're already there
+        // Just clear queues to prevent catch-up animation
         break;
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
