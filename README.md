@@ -9,11 +9,52 @@ Bring your maps to life with beautiful animations that enhance user experience.
 [![Dart](https://img.shields.io/badge/Dart->=3.8.1-blue.svg)](https://dart.dev/)
 
 
-## ⚠️ Important Note
+## ⚠️ Important Notes
 
+### Google Maps Setup
 This library focuses **exclusively** on animating polylines and markers on Google Maps. Google Maps configuration and setup is **out of scope** for this library. Before using this library, please ensure you have properly configured Google Maps in your Flutter project.
 
 For Google Maps setup instructions, refer to the [official Google Maps Flutter documentation](https://pub.dev/packages/google_maps_flutter).
+
+### 🚨 Critical: Lifecycle Management (Prevent Buffer Overflow)
+
+**You MUST call `pause()` when navigating away from the map screen and `resume()` when returning!**
+
+Without this, you'll get errors like:
+```
+W/ImageReader_JNI: Unable to acquire a buffer item, very likely client tried to acquire more than maxImages buffers
+```
+
+**Why this happens:** The animation continues running even when the map widget is not visible, causing Android's ImageReader to overflow its buffer.
+
+**Solution - Choose one:**
+
+**Option 1: Manual Control (Simple)**
+```dart
+// Before navigating away
+mapAnimationController?.pause();
+
+// When returning
+mapAnimationController?.resume();
+```
+
+**Option 2: Automatic with Provider**
+```dart
+class MapProvider extends ChangeNotifier {
+  void onNavigateAway() {
+    mapAnimationController?.pause();
+  }
+  
+  void onReturn() {
+    mapAnimationController?.resume();
+  }
+}
+```
+
+**Option 3: RouteAware (Most Robust)**
+See `example/lib/lifecycle_example.dart` for complete implementation.
+
+**In Provider pattern:** Call `pause()` in your provider when the map screen is not active, and `resume()` when it becomes active again.
 
 
 ## GIF
@@ -245,6 +286,74 @@ When `autoRotateMarkers` is set to `false`:
 | `ColorTransitionAnimation` | Color transitions between multiple colors | Dynamic route highlighting |
 
 
+
+## Best Practices
+
+### Performance Tips
+
+1. **Update Frequency**: Don't update markers too frequently
+   ```dart
+   // ✅ Good: 1-2 seconds
+   Timer.periodic(Duration(seconds: 2), (_) { ... });
+   
+   // ❌ Bad: Too frequent
+   Timer.periodic(Duration(milliseconds: 100), (_) { ... });
+   ```
+
+2. **Custom Markers**: Pre-create and reuse `BitmapDescriptor` icons
+   ```dart
+   // ✅ Good: Create once, reuse
+   final icon = await BitmapDescriptor.fromAssetImage(...);
+   
+   // ❌ Bad: Creating every time
+   marker.copyWith(icon: await BitmapDescriptor.fromAssetImage(...));
+   ```
+
+3. **Marker Count**: Limit animated markers to 50-100 for best performance
+
+4. **Animation Duration**: Match duration to update frequency
+   ```dart
+   // If updating every 2 seconds, use ~1500ms animation
+   markersAnimationDuration: Duration(milliseconds: 1500)
+   ```
+
+### Common Issues and Solutions
+
+#### Issue: "Unable to acquire a buffer item" Error
+**Solution:** Always call `pause()` when navigating away and `resume()` when returning. See lifecycle example.
+
+#### Issue: Markers flickering
+**Solution:** 
+- Reduce update frequency
+- Pre-create custom marker icons
+- Use appropriate animation duration
+
+#### Issue: Markers "catch up" after returning to screen
+**Solution:** This is now handled automatically with `resume()`, which clears queued animations.
+
+#### Issue: Using with Provider/Bloc
+**Solution:** Call `pause()` when provider indicates map is not visible, `resume()` when visible:
+```dart
+class MapProvider extends ChangeNotifier {
+  bool _isMapVisible = true;
+  
+  set isMapVisible(bool value) {
+    _isMapVisible = value;
+    if (value) {
+      mapAnimationController?.resume();
+    } else {
+      mapAnimationController?.pause();
+    }
+  }
+}
+```
+
+## Examples
+
+See the `example` folder for complete implementations:
+- `main.dart` - Basic usage
+- `lifecycle_example.dart` - Proper lifecycle management with pause/resume
+- `manual_rotation_example.dart` - Custom marker rotation
 
 ## Contributing
 

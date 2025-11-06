@@ -99,6 +99,25 @@ class AnimatedMarkersManager {
     }
   }
 
+  /// Pause all animations - stops the animation controller
+  /// Critical: Call this when the map widget is not visible to prevent buffer overflow
+  void pause() {
+    if (_animationController.isAnimating) {
+      _animationController.stop();
+    }
+  }
+
+  /// Resume animations - restarts the animation controller if there are pending markers
+  void resume() {
+    // Don't resume if already animating or no pending markers
+    if (_animationController.isAnimating) return;
+
+    final hasPendingMarkers = _controllers.values.any((m) => m.hasMarker);
+    if (hasPendingMarkers) {
+      _animateMarkers();
+    }
+  }
+
   void _clearMarkersToBeRemoved() {
     if (_markersToBeRemoved.isNotEmpty) {
       for (var markerId in _markersToBeRemoved) {

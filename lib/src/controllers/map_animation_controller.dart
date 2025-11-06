@@ -27,6 +27,9 @@ final class MapAnimationController with WidgetsBindingObserver {
   /// Internal flag to track if animations are paused
   bool _isPaused = false;
 
+  /// Internal flag to track if controller is disposed
+  bool _isDisposed = false;
+
   MapAnimationController({
     required this.mapId,
     required this.vsync,
@@ -39,6 +42,28 @@ final class MapAnimationController with WidgetsBindingObserver {
     // Register lifecycle observer to handle app state changes
     WidgetsBinding.instance.addObserver(this);
     _initialize(markers, polylines);
+  }
+
+  /// Pause all animations - call this when navigating away from the map screen
+  /// This prevents the ImageReader_JNI buffer overflow error
+  void pause() {
+    if (_isDisposed) return;
+    _isPaused = true;
+    _animatedMarkersManager.pause();
+  }
+
+  /// Resume all animations - call this when returning to the map screen
+  void resume() {
+    if (_isDisposed) return;
+    _isPaused = false;
+    // Clear queues to prevent catch-up
+    _animatedMarkersManager.clearAllQueues();
+    _animatedMarkersManager.resume();
+    // Update to current position
+    if (_markers.isNotEmpty) {
+      final currentMarkers = _markers.values.toSet();
+      _updateMarkersOnMap({}, currentMarkers);
+    }
   }
 
   @override
@@ -315,6 +340,9 @@ final class MapAnimationController with WidgetsBindingObserver {
   }
 
   void dispose() {
+    if (_isDisposed) return;
+    _isDisposed = true;
+
     WidgetsBinding.instance.removeObserver(this);
     _animatedMarkersManager.dispose();
     _animatedPolylineManager.dispose();
